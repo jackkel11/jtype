@@ -1,0 +1,27 @@
+﻿<Window x:Class="JType.SearchReplaceWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Search / Replace" Height="200" Width="400" WindowStartupLocation="CenterOwner">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="Find:" VerticalAlignment="Center"/>
+        <TextBox x:Name="FindTextBox" Grid.Row="0" Grid.Column="1"/>
+        <Button Content="Find Next" Grid.Row="0" Grid.Column="2" Click="FindNext_Click"/>
+
+        <TextBlock Grid.Row="1" Grid.Column="0" Text="Replace:" VerticalAlignment="Center"/>
+        <TextBox x:Name="ReplaceTextBox" Grid.Row="1" Grid.Column="1"/>
+        <Button Content="Replace" Grid.Row="1" Grid.Column="2" Click="Replace_Click"/>
+
+        <Button Content="Replace All" Grid.Row="2" Grid.Column="1" HorizontalAlignment="Right" Click="ReplaceAll_Click"/>
+    </Grid>
+</Window>

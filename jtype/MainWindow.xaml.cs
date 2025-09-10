@@ -9,6 +9,8 @@ namespace JType
 {
     public partial class MainWindow : Window
     {
+        private readonly string[] _keywords = { "class", "void", "int", "if", "else", "public", "private", "string", "for", "while" };
+
         public MainWindow()
         {
             InitializeComponent();
@@ -23,9 +25,10 @@ namespace JType
 
             FontFamilyBox.SelectedItem = "Segoe UI";
             FontSizeBox.SelectedItem = 14;
+
+            LineSpacingBox.SelectedIndex = 0; // default 1x line spacing
         }
 
-        // Get current RichTextBox
         private RichTextBox? GetCurrentEditor()
         {
             if (TabEditor.SelectedContent is RichTextBox editor)
@@ -44,8 +47,8 @@ namespace JType
                 AcceptsTab = true,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto
             };
+            editor.TextChanged += RichTextBox_TextChanged;
             SpellCheck.SetIsEnabled(editor, true);
-
             tab.Content = editor;
             TabEditor.Items.Add(tab);
             TabEditor.SelectedItem = tab;
@@ -72,6 +75,7 @@ namespace JType
                     range.Load(fs, DataFormats.Text);
 
                 ((TabItem)TabEditor.SelectedItem).Header = Path.GetFileName(dlg.FileName);
+                HighlightSyntax(editor);
             }
         }
 
@@ -102,77 +106,122 @@ namespace JType
         private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
         // --- Text Formatting ---
-        private void Bold_Click(object sender, RoutedEventArgs e)
-        {
-            var editor = GetCurrentEditor();
-            if (editor != null)
-                EditingCommands.ToggleBold.Execute(null, editor);
-        }
-
-        private void Italic_Click(object sender, RoutedEventArgs e)
-        {
-            var editor = GetCurrentEditor();
-            if (editor != null)
-                EditingCommands.ToggleItalic.Execute(null, editor);
-        }
-
-        private void Underline_Click(object sender, RoutedEventArgs e)
-        {
-            var editor = GetCurrentEditor();
-            if (editor != null)
-                EditingCommands.ToggleUnderline.Execute(null, editor);
-        }
+        private void Bold_Click(object sender, RoutedEventArgs e) => EditingCommands.ToggleBold.Execute(null, GetCurrentEditor());
+        private void Italic_Click(object sender, RoutedEventArgs e) => EditingCommands.ToggleItalic.Execute(null, GetCurrentEditor());
+        private void Underline_Click(object sender, RoutedEventArgs e) => EditingCommands.ToggleUnderline.Execute(null, GetCurrentEditor());
 
         private void FontFamilyBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             var editor = GetCurrentEditor();
-            if (editor == null) return;
-
-            if (FontFamilyBox.SelectedItem != null)
-                editor.Selection.ApplyPropertyValue(TextElement.FontFamilyProperty,
-                                                    new FontFamily(FontFamilyBox.SelectedItem.ToString()));
+            if (editor != null && FontFamilyBox.SelectedItem != null)
+                editor.Selection.ApplyPropertyValue(TextElement.FontFamilyProperty, new FontFamily(FontFamilyBox.SelectedItem.ToString()));
         }
 
         private void FontSizeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             var editor = GetCurrentEditor();
-            if (editor == null) return;
-
-            if (FontSizeBox.SelectedItem != null)
-                editor.Selection.ApplyPropertyValue(TextElement.FontSizeProperty,
-                                                    (double)(int)FontSizeBox.SelectedItem);
+            if (editor != null && FontSizeBox.SelectedItem != null)
+                editor.Selection.ApplyPropertyValue(TextElement.FontSizeProperty, (double)(int)FontSizeBox.SelectedItem);
         }
 
         private void TextColorPicker_SelectedColorChanged(object sender, RoutedPropertyChangedEventArgs<Color?> e)
         {
             var editor = GetCurrentEditor();
-            if (editor == null || !e.NewValue.HasValue) return;
-
-            editor.Selection.ApplyPropertyValue(TextElement.ForegroundProperty,
-                                                new SolidColorBrush(e.NewValue.Value));
+            if (editor != null && e.NewValue.HasValue)
+                editor.Selection.ApplyPropertyValue(TextElement.ForegroundProperty, new SolidColorBrush(e.NewValue.Value));
         }
 
         private void HighlightColorPicker_SelectedColorChanged(object sender, RoutedPropertyChangedEventArgs<Color?> e)
         {
             var editor = GetCurrentEditor();
-            if (editor == null || !e.NewValue.HasValue) return;
-
-            editor.Selection.ApplyPropertyValue(TextElement.BackgroundProperty,
-                                                new SolidColorBrush(e.NewValue.Value));
+            if (editor != null && e.NewValue.HasValue)
+                editor.Selection.ApplyPropertyValue(TextElement.BackgroundProperty, new SolidColorBrush(e.NewValue.Value));
         }
 
         private void Undo_Click(object sender, RoutedEventArgs e)
         {
             var editor = GetCurrentEditor();
-            if (editor != null && editor.CanUndo)
-                editor.Undo();
+            if (editor != null && editor.CanUndo) editor.Undo();
         }
 
         private void Redo_Click(object sender, RoutedEventArgs e)
         {
             var editor = GetCurrentEditor();
-            if (editor != null && editor.CanRedo)
-                editor.Redo();
+            if (editor != null && editor.CanRedo) editor.Redo();
+        }
+
+        // --- Search / Replace ---
+        private void SearchReplace_Click(object sender, RoutedEventArgs e)
+        {
+            var editor = GetCurrentEditor();
+            if (editor != null)
+            {
+                SearchReplaceWindow win = new SearchReplaceWindow(editor);
+                win.Owner = this;
+                win.Show();
+            }
+        }
+
+        // --- Line Spacing ---
+        private void LineSpacingBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var editor = GetCurrentEditor();
+            if (editor == null || LineSpacingBox.SelectedItem == null) return;
+
+            if (LineSpacingBox.SelectedItem is ComboBoxItem item &&
+                double.TryParse(item.Content.ToString(), out double spacing))
+            {
+                var selection = editor.Selection;
+
+                TextPointer start = selection.IsEmpty ? selection.Start : selection.Start;
+                TextPointer end = selection.IsEmpty ? selection.Start : selection.End;
+
+                while (start != null && start.CompareTo(end) <= 0)
+                {
+                    Paragraph? paragraph = start.Paragraph;
+                    if (paragraph != null)
+                    {
+                        paragraph.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
+                        paragraph.LineHeight = paragraph.FontSize * spacing;
+                    }
+
+                    start = paragraph?.ContentEnd.GetNextInsertionPosition(LogicalDirection.Forward);
+                    if (start == null) break;
+                }
+            }
+        }
+
+        // --- Syntax Highlighting ---
+        private void RichTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            var editor = sender as RichTextBox;
+            if (editor != null) HighlightSyntax(editor);
+        }
+
+        private void HighlightSyntax(RichTextBox editor)
+        {
+            TextRange documentRange = new TextRange(editor.Document.ContentStart, editor.Document.ContentEnd);
+            documentRange.ClearAllProperties();
+
+            TextPointer pointer = editor.Document.ContentStart;
+            while (pointer != null && pointer.CompareTo(editor.Document.ContentEnd) < 0)
+            {
+                if (pointer.GetPointerContext(LogicalDirection.Forward) == TextPointerContext.Text)
+                {
+                    string runText = pointer.GetTextInRun(LogicalDirection.Forward);
+                    foreach (string keyword in _keywords)
+                    {
+                        int index = runText.IndexOf(keyword);
+                        if (index >= 0)
+                        {
+                            TextPointer start = pointer.GetPositionAtOffset(index);
+                            TextPointer end = start.GetPositionAtOffset(keyword.Length);
+                            new TextRange(start, end).ApplyPropertyValue(TextElement.ForegroundProperty, Brushes.Blue);
+                        }
+                    }
+                }
+                pointer = pointer.GetNextContextPosition(LogicalDirection.Forward);
+            }
         }
     }
 }
